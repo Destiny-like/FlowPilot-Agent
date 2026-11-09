@@ -1,140 +1,200 @@
 # FlowPilot AI 研发协作 Agent 平台
 
-> 你的 AI 研发领航员
+> 你的 AI 研发领航员 —— 面向 GitHub Issue / PR / CI 全流程的全栈 AI Agent 系统
 
-FlowPilot AI 是一个面向 GitHub PR / Issue 研发协作的全栈 AI Agent 项目。系统会连接仓库数据，分析 Issue、PR diff、CI 日志、项目知识库和本地工作区代码，并返回结构化建议与安全的操作草稿。
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=nextdotjs&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![Milvus](https://img.shields.io/badge/Milvus-00A1EA?logo=milvus&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 
-## 核心能力
+## 项目简介
 
-- 连接并同步 GitHub 仓库中的 Issue、Pull Request、PR 文件、Review 评论、Workflow Run、Job 和日志。
-- Issue 分析：分类、优先级、复杂度、推荐负责人、重复候选和行动项。
-- PR 审查：摘要、关键变更、风险点、检查清单、测试建议和需要重点关注的文件。
-- CI 排障：失败类型、可能原因、排查步骤和相关上下文。
-- Agent 对话：`ChatAgent` 使用原生工具调用，串联工作区、记忆、RAG、Issue、PR、CI、周报和安全工具。
-- 多 Agent 工作流审查：`WorkflowOrchestrator` 构建 Planner -> 专用 Agent -> Observer -> Synthesis 的闭环，用于 PR 就绪度、阻塞项、优先级和跨领域工程决策。
-- Skill Runtime：按用户显式指定或触发条件选择 `SKILL.md`，只向当前任务加载完整指令与受限资源；显式 Skill 校验允许工具，多 Agent 中的专用 Agent 分别加载自己的 Skill，并把版本、激活原因、指令摘要和执行校验写入 trace。
-- 工作区代码工具：安全地列出文件、读取文件和搜索本地代码。
-- RAG 聚焦 Issue 描述、PR 说明与 Review 评论、失败 CI 日志、项目文档、上传知识和已批准的长期记忆；当前代码走工作区/词法检索，团队与实时状态走结构化查询。
-- 生成工程周报。
-- 基础 Eval 覆盖 Issue 分类、PR 覆盖度、RAG 命中率、工具 schema 就绪度和结构化输出校验。
+FlowPilot 是一个面向真实研发协作场景的全栈 AI Agent 平台。系统连接 GitHub 仓库，自动同步 Issue、Pull Request、CI 日志、项目知识库与本地工作区代码，由具备**原生工具调用（Function Calling）能力**的 Agent 进行分析，并以**安全草稿 + 人工确认**的方式产出可执行的工程操作，避免 AI 直接对外部系统造成副作用。
 
-## 技术栈
+项目采用前后端分离架构，提供「免依赖 SQLite 演示模式」与「PostgreSQL + Milvus 完整模式」两套运行方式，可在普通笔记本上一键启动。
 
-- 后端：Python、FastAPI、Pydantic、SQLAlchemy、PostgreSQL、Milvus、httpx、LangChain。
-- Agent 编排：原生工具调用 + 专用分析 Agent。
-- 前端：Next.js、TypeScript、Tailwind CSS、React Query。
-- 基础设施：Docker Compose 与 `.env` 配置。
+## 核心功能
 
-## 架构
+### AI Agent 研发协作
+
+- **Issue 智能分析**：自动分类、优先级、复杂度、推荐负责人、重复候选与行动项
+- **PR 审查助手**：基于变更文件与 diff 生成摘要、风险点、Review Checklist 与测试建议
+- **CI 排障**：聚合 Workflow 运行状态与失败日志，归纳失败类型、可能原因与排查步骤
+- **Agent 对话**：`ChatAgent` 通过原生工具调用串联工作区、记忆、RAG、Issue、PR、CI、周报等工具
+- **工程周报**：自动汇总周期内的研发活动并生成结构化报告
+
+### 多 Agent 工作流
+
+`WorkflowOrchestrator` 构建 **Planner → 专用 Agent → Observer → Synthesis** 的闭环：先由规划 Agent 拆解任务，再分发给各专用 Agent 并行分析，观察 Agent 负责校验，最终由综合 Agent 汇总，用于 PR 就绪度评估、阻塞项识别与跨领域工程决策。
+
+### RAG 知识问答系统
+
+- 完整 RAG 链路：文档解析 → 段落感知切片 → Embedding → **向量/关键词混合检索** → 重排 → 基于证据生成并附**编号引用**
+- 支持 TXT、Markdown、PDF、DOCX、JSON、CSV 与日志文件，按 SHA-256 去重
+- 混合检索：进入推理前由 `ContextAssembler` 预注入证据，推理中 Agent 仍可把 `rag.search` 作为工具改写查询、交叉验证
+- 数据分级处理：仅对需要语义召回的非结构化知识向量化，源码走工作区检索，实时状态走结构化查询，避免盲目向量化
+
+### 工程质量与安全
+
+- **安全草稿机制**：所有外部写操作先生成可审阅草稿，经具备权限的用户确认后才执行，并写入审计记录
+- **RAGAS 质量评测**：在隔离会话中真实运行 ChatAgent，计算 Context Precision / Recall、Faithfulness、Answer Relevancy、Agent Goal Accuracy 五项指标，支持同基线回归对比
+- **Skill Runtime**：按显式指定或触发条件按需加载 `SKILL.md`，并将版本、激活原因与执行校验写入 trace
+- **MCP 集成**：内置 MCP 服务与客户端，支持可扩展的工具生态
+
+## 系统架构
 
 ```mermaid
 flowchart TD
-    FE["Next.js 前端"] --> API["FastAPI 后端"]
+    FE["Next.js 前端 (React Query / Tailwind)"] --> API["FastAPI 后端"]
     API --> DB["PostgreSQL"]
     API --> Milvus["Milvus 向量库"]
     API --> GH["GitHub REST API"]
-    API --> LLM["OpenAI 兼容 LLM API"]
-    API --> Conv["对话 Agent"]
-    Conv --> Workflow["工作流编排器"]
-    Workflow --> Planner["规划 Agent"]
-    Workflow --> Observer["观察 Agent"]
-    Workflow --> Synthesis["综合 Agent"]
-    Conv --> Workspace["工作区工具"]
-    Conv --> Memory["记忆 / RAG 工具"]
-    Conv --> Issue["Issue 分析 Agent"]
-    Conv --> PR["PR 审查 Agent"]
-    Conv --> CI["CI 排障 Agent"]
-    Conv --> Report["周报 Agent"]
-    Conv --> Safety["安全 Agent"]
-    Conv --> Skills["Skill 注册中心"]
+    API --> LLM["OpenAI 兼容 LLM"]
+    API --> Conv["ChatAgent 对话 Agent"]
+    Conv --> Orch["Workflow Orchestrator"]
+    Orch --> Planner["Planner Agent"]
+    Orch --> Specialized["专用 Agent (Issue/PR/CI)"]
+    Orch --> Observer["Observer Agent"]
+    Orch --> Synthesis["Synthesis Agent"]
+    Conv --> RAG["RAG 混合检索"]
+    Conv --> Workspace["工作区代码工具"]
+    Conv --> Memory["记忆 / 知识库"]
+    Conv --> Skills["Skill 注册中心 & MCP"]
+```
+
+## 技术栈
+
+| 分层 | 技术 |
+| --- | --- |
+| 后端 | Python 3.13、FastAPI、Pydantic、SQLAlchemy、httpx、LangChain |
+| Agent | 原生 Function Calling、多 Agent 编排、ReAct 工具循环 |
+| 前端 | Next.js 15、TypeScript、Tailwind CSS、React Query |
+| 数据存储 | PostgreSQL、Milvus（向量）、SQLite（演示） |
+| 基础设施 | Docker Compose、WSL2、`.env` 配置 |
+| 质量评测 | RAGAS 0.4、pytest、结构化输出校验 |
+
+## 项目结构
+
+```text
+DevFlow-AI
+├── backend/
+│   ├── app/
+│   │   ├── api/routes/        # FastAPI 路由（chat/rag/issues/ci/evals 等）
+│   │   ├── core/              # 配置与基础组件
+│   │   ├── db/                # 数据库模型与会话
+│   │   ├── services/
+│   │   │   ├── agents/        # ChatAgent 及各专用 Agent、编排器
+│   │   │   ├── rag/           # 切片、检索、重排、Embedding
+│   │   │   ├── llm/           # LLM 封装与结构化输出
+│   │   │   └── evals/         # RAGAS 评测运行器
+│   │   ├── mcp/               # MCP 服务
+│   │   ├── skills/            # 内置 Skill 定义
+│   │   └── tests/             # pytest 测试
+│   └── requirements.txt
+├── frontend/
+│   ├── app/                   # Next.js App Router 页面
+│   ├── components/            # UI 组件与布局
+│   └── lib/                   # 前端数据请求与工具
+├── docs/
+│   └── screenshots/           # 项目截图
+├── scripts/                   # 一键启动/停止脚本
+├── docker-compose.yml
+├── .env.example
+├── 一键启动.bat / 一键停止.bat
+└── 启动说明.md
 ```
 
 ## 快速开始
 
+### 方式一：一键启动（Windows，推荐）
+
+双击项目根目录的 **`一键启动.bat`**，脚本会自动定位运行环境、启动后端与前端、初始化演示数据并打开浏览器。
+
+默认采用 **SQLite 演示模式，无需 Docker**，端口约定：
+
+| 用途 | 地址 |
+| --- | --- |
+| 前端页面 | http://127.0.0.1:3000 |
+| 后端接口 | http://127.0.0.1:8010 |
+| API 文档（Swagger） | http://127.0.0.1:8010/docs |
+| 健康检查 | http://127.0.0.1:8010/health |
+
+> 后端默认端口为 8010，用于避开本机 Docker 容器可能占用的 8000 端口。命令行启动：`.\scripts\devflow-start.ps1`，停止：`.\scripts\devflow-stop.ps1`。
+
+### 方式二：完整模式（PostgreSQL + Milvus）
+
 ```bash
+# 1. 准备环境变量
 cp .env.example .env
+
+# 2. 启动基础设施（PostgreSQL、etcd、MinIO、Milvus）
 docker compose up -d postgres etcd minio milvus
 
+# 3. 启动后端
 cd backend
 python -m venv .venv
-.venv\Scripts\activate
+# Windows: .venv\Scripts\activate ; Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
-```
 
-另开一个终端：
-
-```bash
+# 4. 另开终端启动前端
 cd frontend
 npm install
 npm run dev
 ```
 
-默认地址：
+## 项目截图
 
-- 后端：http://localhost:8000
-- API 文档：http://localhost:8000/docs
-- 前端：http://localhost:3000
+### 工作台总览
 
-## RAG 知识问答系统
+![工作台总览](docs/screenshots/01-dashboard.png)
 
-项目内置了与第 7.1 节流程一一对应的完整 RAG 系统：知识库创建向导、文档解析、段落感知切片、Embedding、向量/关键词混合检索、重排、召回测试、问答工作室、上下文组装、基于证据生成和编号引用。支持 TXT、Markdown、PDF、DOCX、JSON、CSV 与日志文件；重复文件会按 SHA-256 跳过。
+### Agent 对话
 
-对话链路采用混合 RAG：`ContextAssembler` 会在调用 ChatAgent 前按原始问题检索并注入证据；进入推理循环后，模型仍可把 `rag.search_similar_documents` 当作工具，改写查询、连续补查不同资料，并根据多次工具结果交叉验证答案。
+![Agent 对话](docs/screenshots/02-chat.png)
 
-项目不会把所有私域数据都向量化。只有需要跨来源语义召回、会反复使用的非结构化知识进入 RAG；源码与配置以当前 checkout 为准，优先通过 `workspace.search_code` 和 `workspace.read_file` 检索；Issue、PR、CI 的状态字段、团队成员和周报等结构化或派生数据直接查数据库/API。RAG 返回的是候选证据，涉及实时状态和当前代码时仍要回到权威数据源核验。
+### Issue 智能分析
 
-从旧版本升级后，请对每个知识库调用一次 `POST /api/rag/{repo_id}/reindex`。重建会按新边界清理历史向量和旧会话 Document；只部署代码不会主动删除已有索引。
+![Issue 智能分析](docs/screenshots/05-issues.png)
 
-如果只想先验证页面、结构化数据和无模型兜底回答，Windows 本地可以用下面的脚本启动 SQLite 演示环境：
+### PR Review 助手
 
-```powershell
-.\scripts\start_rag.ps1
-```
+![PR Review 助手](docs/screenshots/06-pull-requests.png)
 
-脚本会关闭 Milvus，使用 deterministic embedding 和启发式重排，并停用演示知识库的 `0.8` 分数阈值，避免只有关键词分支时全部候选都被过滤。因此它可以验证页面、上传解析、关系库存储、Hybrid 的关键词分支和引用展示，但向量检索状态会明确显示 `degraded`，不能用来证明完整 RAG 已经跑通。要验证向量召回、混合检索和重建索引，仍需先按“快速开始”启动 PostgreSQL、etcd、MinIO 和 Milvus。
+### CI 排障分析
 
-知识库默认选择 `Qwen/Qwen3-Embedding-0.6B` 与 `qwen3-rerank`。安装 `backend/requirements-local-embedding.txt` 后可运行本地 Qwen Embedding；配置 `DASHSCOPE_API_KEY`、`RERANK_BASE_URL` 后可切换百炼 `text-embedding-v4` 与 `qwen3-rerank`。默认 Embedding 依赖缺失时系统会明确报错，不会在生产配置下静默改用另一套向量空间；只有上面的本地演示脚本会显式选择 deterministic embedding。已经配置 `LLM_API_KEY` 时，可用 `.\scripts\start_rag.ps1 -UseConfiguredLLM` 启用模型生成。
+![CI 排障](docs/screenshots/07-ci.png)
 
-RAG API：
+### RAGAS 质量评测工作台
+
+![RAGAS 评测](docs/screenshots/08-evals.png)
+
+## 工程亮点
+
+1. **完整的 Agent 工具调用闭环**：基于原生 Function Calling 实现 ReAct 式推理，Agent 可自主选择并串联十余种工具，支持多轮改写查询与交叉验证。
+2. **多 Agent 协同编排**：Planner / 专用 Agent / Observer / Synthesis 分工协作，兼顾分析深度与结论可靠性。
+3. **可落地的混合检索 RAG**：向量 + 关键词混合检索叠加重排与证据引用，并对数据按是否需要语义召回进行分级，避免无效向量化。
+4. **安全可控的写操作设计**：所有外部操作落为可审阅草稿，经人工确认与审计后才执行，规避 AI 误操作风险。
+5. **可量化的质量体系**：用 RAGAS 五指标对 Agent 做自动化评测与回归，把「链路能跑通」和「回答质量达标」明确区分。
+6. **双模式可移植**：一套代码同时支持免依赖 SQLite 演示与 PostgreSQL + Milvus 完整部署，普通笔记本即可完整体验。
+
+## API 文档
+
+启动后端后访问 Swagger UI：http://127.0.0.1:8010/docs ，可在线查看并调试全部接口。部分核心模块：
 
 ```text
-POST /api/rag/knowledge-bases
-GET  /api/rag/knowledge-bases
-GET  /api/rag/knowledge-bases/{repo_id}
-POST /api/rag/knowledge-bases/{repo_id}/documents
-POST /api/rag/knowledge-bases/{repo_id}/retrieval-tests
-GET  /api/rag/{repo_id}/status
-POST /api/rag/{repo_id}/search
-POST /api/rag/{repo_id}/ask
-POST /api/rag/{repo_id}/reindex
+/api/chat          # Agent 对话
+/api/rag           # 知识库、检索、问答
+/api/issues        # Issue 分析
+/api/pull-requests # PR 审查
+/api/ci            # CI 排障
+/api/evals         # RAGAS 评测
+/api/action-drafts # 安全草稿与人工确认
 ```
 
-## ChatAgent RAGAS 评测
+## License
 
-启动主应用后打开 `http://127.0.0.1:3000/evals`，选择仓库、固定评测集和 Top-K，再点击“运行固定 RAGAS 评测”。评测会在隔离会话中真实运行生产 ChatAgent 和工具集，收集预检索与 Agent 二次检索证据，然后使用 Ragas 0.4 Collections API 计算 Context Precision、Context Recall、Faithfulness、Answer Relevancy 和 Agent Goal Accuracy。结果会保存评测集 Hash、阈值、逐题工具轨迹、检索证据、硬规则与失败诊断，便于对同一基线做回归。
-
-默认 Judge 复用 `LLM_API_KEY`、`LLM_BASE_URL` 和 `LLM_MODEL`；也可以通过 `.env` 中的 `RAGAS_JUDGE_API_KEY`、`RAGAS_JUDGE_BASE_URL`、`RAGAS_JUDGE_MODEL` 单独配置。主项目内置的正式基准位于 `docs/datas/evals/rag_cases.json`，启动时会检查用例引用的文档是否已进入当前仓库知识库：
-
-```http
-POST /api/evals/rag/run
-Content-Type: application/json
-
-{
-  "repo_id": "<repository-uuid>",
-  "run_judge": true,
-  "top_k": 5,
-  "suite_id": "devflow-real-project-rag-baseline"
-}
-```
-
-提交接口会立即返回 `queued` 状态和 `eval_id`，ChatAgent 与 RAGAS 在后台继续运行。通过 `GET /api/evals/{eval_id}` 轮询 `result.progress`；状态变为 `passed`、`failed`、`error` 或 `no_cases` 时结束。网页会自动轮询，刷新或离开页面不会中断已经提交的任务。
-
-整体通过要求硬规则全部满足，并且五项语义指标都达到 `.env` 中对应的 `RAGAS_*_MIN` 门槛。页面把“执行状态”和“质量状态”分开显示：低分是质量失败；Judge 调用失败或指标缺失是评测不完整，不能伪装成质量结论。
-
-评测失败后可以直接在同一页面继续处理：
-
-- 展开 Case 查看实际回答、参考答案、检索来源、工具轨迹和可执行诊断；
-- 对 Judge 超时或缺失指标点击“仅重试异常评分”，复用已经保存的回答和证据，不重新运行 ChatAgent；
-- 选择两个相同评测集 Hash、Ragas/Judge 配置和 Top-K 的结果做回归对比；
-- 生成 `create_issue` 类型的 ActionDraft，把失败 Case、证据和建议带入人工确认流程，不会直接写入 GitHub。
+本项目仅用于学习与个人作品集展示。
